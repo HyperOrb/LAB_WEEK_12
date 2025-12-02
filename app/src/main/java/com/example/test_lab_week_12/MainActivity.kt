@@ -6,12 +6,15 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.RecyclerView
 import com.example.test_lab_week_12.MovieAdapter
 import com.example.test_lab_week_12.model.Movie
 import com.example.test_lab_week_12.MovieApplication
 import com.example.lab_week_12.MovieViewModel
 import com.google.android.material.snackbar.Snackbar
+import kotlinx.coroutines.launch
 import java.util.Calendar
 
 class MainActivity : AppCompatActivity(), MovieAdapter.MovieClickListener {
@@ -33,18 +36,25 @@ class MainActivity : AppCompatActivity(), MovieAdapter.MovieClickListener {
             }
         )[MovieViewModel::class.java]
 
-        movieViewModel.popularMovies.observe(this) { popularMovies: List<Movie> ->
-            val currentYear = Calendar.getInstance().get(Calendar.YEAR).toString()
-            movieAdapter.addMovies(
-                popularMovies
-                    .filter { movie: Movie -> movie.releaseDate?.startsWith(currentYear) == true }
-                    .sortedByDescending { movie: Movie -> movie.popularity }
-            )
-        }
-
-        movieViewModel.error.observe(this) { errorMessage: String ->
-            if (errorMessage.isNotEmpty()) {
-                Snackbar.make(recyclerView, errorMessage, Snackbar.LENGTH_LONG).show()
+        lifecycleScope.launch {
+            repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                launch {
+                    movieViewModel.popularMovies.collect { movies: List<Movie> ->
+                        val currentYear = Calendar.getInstance().get(Calendar.YEAR).toString()
+                        movieAdapter.addMovies(
+                            movies
+                                .filter { movie: Movie -> movie.releaseDate?.startsWith(currentYear) == true }
+                                .sortedByDescending { movie: Movie -> movie.popularity }
+                        )
+                    }
+                }
+                launch {
+                    movieViewModel.error.collect { errorMessage: String ->
+                        if (errorMessage.isNotEmpty()) {
+                            Snackbar.make(recyclerView, errorMessage, Snackbar.LENGTH_LONG).show()
+                        }
+                    }
+                }
             }
         }
     }
